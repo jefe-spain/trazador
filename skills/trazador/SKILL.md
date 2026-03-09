@@ -30,6 +30,7 @@ All commands read workspace constants (team, project, statuses, labels) from thi
 | `/trazador:work` | Agent execution — pick up a Linear issue and implement it | A `Todo` issue is ready for implementation |
 | `/trazador:review` | Goal-aligned review — validate work against the original task | PR is ready, before merge |
 | `/trazador:sync` | Automatic state sync — update Linear from agent actions | Runs automatically after plan/work/review |
+| `/trazador:autopilot` | Autonomous supervisor — dispatch teammate agents to work through issues | Hands-free execution of Todo backlog |
 
 ## Workflow
 
@@ -65,6 +66,13 @@ You (PM)                    Agent (Claude/Codex)
    |                              |-- runs technical review agents
    |                              |-- posts findings as Linear comment
    |                              |-- sync: status -> Done (if approved)
+   |                              |
+   |-- /trazador:autopilot ------>|  (hands-free)
+   |                              |-- supervisor picks Todo issues
+   |                              |-- spawns teammate agent per issue
+   |                              |-- teammate: work + self-review
+   |                              |-- supervisor logs results
+   |                              |-- repeats until done or max reached
 ```
 
 ## Agent Session Protocol

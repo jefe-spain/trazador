@@ -14,6 +14,7 @@ Trazador connects AI coding agents (Claude Code, Codex) to Linear so every task 
 | `/trazador:work` | Pick up an issue, implement it, ship a PR |
 | `/trazador:review` | Validate implementation against the spec, then technical review |
 | `/trazador:sync` | Keep Linear in sync, check project health |
+| `/trazador:autopilot` | Autonomous mode — supervisor dispatches teammate agents per issue |
 
 ## Install
 
@@ -48,6 +49,31 @@ This will:
 /trazador:work ISSUE-XX → "Build it"
 /trazador:review ISSUE-XX → "Did we build the right thing?"
 /trazador:sync          → "Keep everything in sync"
+/trazador:autopilot     → "Work through the backlog autonomously"
+```
+
+## Autopilot Mode
+
+```
+/trazador:autopilot 5 autopilot-ready
+```
+
+Runs a lightweight supervisor that:
+1. Reads Todo issues from Linear (optionally filtered by label)
+2. Spawns a **teammate agent** per issue (fresh context, full window)
+3. Teammate does the full cycle: branch → code → test → PR → self-review
+4. Supervisor logs results, picks the next issue
+5. Posts a session summary to Linear
+
+```
+┌─────────────────────────────┐
+│  Autopilot (supervisor)     │  ← tiny context, just dispatch + track
+│  for each Todo issue:       │
+│    spawn teammate(issue_id) │──→ ┌──────────────────────────┐
+│    log result               │    │  Teammate (worker agent)  │
+│  end                        │    │  Full context per issue   │
+└─────────────────────────────┘    │  work → test → PR → review│
+                                   └──────────────────────────┘
 ```
 
 ## How it differs from Task Master
