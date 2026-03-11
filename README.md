@@ -1,4 +1,4 @@
-# trazador
+# Trazador
 
 *Trazador* (Spanish: tracer) — traces every task from issue to shipped PR. Nothing gets lost.
 
