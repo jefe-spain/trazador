@@ -164,12 +164,20 @@ Combine goal alignment and technical review into a single report.
    gh pr review <pr_number> --approve --body "Trazador review passed. Goal aligned, technical checks clear."
    ```
 
-4. **If REQUEST CHANGES:**
+4. **If APPROVE and epic (has sub-issues)** — move all sub-issues to "Done":
+   - Fetch sub-issues: `mcp__linear-server__list_issues` with `parentId: <issue_id>`
+   - For each sub-issue:
+     ```
+     mcp__linear-server__save_issue(id: <sub_issue_id>, state: <config.linear.statuses.done>)
+     mcp__linear-server__save_comment(issueId: <sub_issue_id>, body: "## Review Passed\n\nParent ISSUE-XX approved. Moving to Done.\nPR: <pr_url>")
+     ```
+
+5. **If REQUEST CHANGES:**
    ```bash
    gh pr review <pr_number> --request-changes --body "See Linear comment on ISSUE-XX for details."
    ```
 
-5. **Present to user:**
+6. **Present to user:**
    ```
    Review complete for ISSUE-XX: <title>
 
@@ -177,6 +185,8 @@ Combine goal alignment and technical review into a single report.
    Verdict: [APPROVE / REQUEST CHANGES / DISCUSS]
 
    P1: [count] | P2: [count] | P3: [count]
+
+   Sub-issues: [list with final status if epic]
 
    [If REQUEST CHANGES: list the P1/P2 items]
 

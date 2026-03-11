@@ -73,7 +73,12 @@ Use **AskUserQuestion**: "This issue doesn't have clear acceptance criteria. Sho
    mcp__linear-server__save_comment(issueId: <issue_id>, body: "## Work Started\n\nBranch: `<branch_name>`\nAgent: Claude Code\nStarted: YYYY-MM-DD HH:MM UTC")
    ```
 
-3. **Create branch** from the Linear-suggested branch name (available in issue data) or generate one:
+3. **If epic (has sub-issues)** — discover sub-issues (but don't transition them yet):
+   - Fetch sub-issues: `mcp__linear-server__list_issues` with `parentId: <issue_id>`
+   - Store their IDs and titles for tracking throughout the workflow
+   - Do NOT move sub-issues to "In Progress" here — each sub-issue transitions only when you start working on it (see Phase 4)
+
+4. **Create branch** from the Linear-suggested branch name (available in issue data) or generate one:
    ```bash
    git checkout main && git pull origin main
    git checkout -b <branch_name>
@@ -83,6 +88,32 @@ Use **AskUserQuestion**: "This issue doesn't have clear acceptance criteria. Sho
 ### Phase 4: Implement
 
 **Task execution loop:**
+
+**If epic (has sub-issues)** — loop over sub-issues instead of individual criteria:
+
+```
+For each sub-issue:
+  1. Move this sub-issue to "In Progress":
+     mcp__linear-server__save_issue(id: <sub_issue_id>, state: <config.linear.statuses.in_progress>)
+     mcp__linear-server__save_comment(issueId: <sub_issue_id>, body: "## Work Started\n\nBranch: `<branch_name>`\nAgent: Claude Code\nParent: <issue_id>")
+  2. Read the sub-issue description and acceptance criteria
+  3. For each acceptance criterion in this sub-issue:
+     a. Read referenced files from the issue approach
+     b. Look for similar patterns in codebase (grep/glob)
+     c. Implement following existing conventions
+     d. Write tests for new functionality
+     e. Run tests after changes
+  4. Commit when the sub-issue's work is complete
+  5. Move this sub-issue to "In Review":
+     mcp__linear-server__save_issue(id: <sub_issue_id>, state: <config.linear.statuses.in_review>)
+  6. Post a progress comment on the sub-issue:
+     mcp__linear-server__save_comment(issueId: <sub_issue_id>, body: "## Implementation Complete\n\n### Changes\n- <file>: <what changed>\n\n### Criteria Met\n- [x] ...")
+  7. Continue to the next sub-issue
+```
+
+Sub-issues transition independently: a sub-issue moves to "In Review" as soon as its work is committed, even while other sub-issues are still "In Progress".
+
+**If regular issue (no sub-issues)** — loop over acceptance criteria:
 
 ```
 For each acceptance criterion:
@@ -122,18 +153,38 @@ For each acceptance criterion:
 
 1. **Run the project's test suite** (discover the test commands from package.json, Makefile, or similar)
 2. **Run type checking** if the project uses TypeScript or similar
-3. **Verify all acceptance criteria** from the issue — check each one explicitly:
+3. **Verify all acceptance criteria** — check each one explicitly:
+
+   **If epic (has sub-issues)** — verify per sub-issue:
+   ```
+   Sub-issue ISSUE-31 (<title>):
+     - [x] Criterion 1 — verified by: <how>
+     - [x] Criterion 2 — verified by: <how>
+
+   Sub-issue ISSUE-32 (<title>):
+     - [x] Criterion 1 — verified by: <how>
+     - [ ] Criterion 2 — NOT MET: <why>
+   ```
+
+   **If regular issue (no sub-issues):**
    ```
    Acceptance Criteria Verification:
    - [x] Criterion 1 — verified by: <how>
    - [x] Criterion 2 — verified by: <how>
    - [ ] Criterion 3 — NOT MET: <why>
    ```
+
 4. **If any criterion is not met**, fix it before proceeding. If it can't be met, use **AskUserQuestion** to discuss.
 
 ### Phase 6: Ship It
 
-1. **Create PR:**
+1. **If epic (has sub-issues)** — sweep all sub-issues before creating the PR:
+   - Any sub-issues still in "In Progress" should be moved to "In Review":
+     ```
+     mcp__linear-server__save_issue(id: <sub_issue_id>, state: <config.linear.statuses.in_review>)
+     ```
+
+2. **Create PR:**
    ```bash
    git push -u origin <branch_name>
    ```
@@ -154,6 +205,13 @@ For each acceptance criterion:
    - [x] Criterion 1
    - [x] Criterion 2
 
+   ## Sub-Issues (if epic)
+
+   | Sub-Issue | Title | Status |
+   |-----------|-------|--------|
+   | ISSUE-31 | <title> | In Review |
+   | ISSUE-32 | <title> | In Review |
+
    ## Testing
 
    - Tests added/modified
@@ -169,27 +227,34 @@ For each acceptance criterion:
    Generated with [Claude Code](https://claude.com/claude-code)
    ```
 
-2. **Update Linear — move to "In Review":**
+3. **Update Linear — move to "In Review":**
    ```
    mcp__linear-server__save_issue(id: <issue_id>, state: <config.linear.statuses.in_review>)
    ```
 
-3. **Post completion comment** on the issue:
+4. **Post completion comment** on the issue:
    ```
-   mcp__linear-server__save_comment(issueId: <issue_id>, body: "## Work Complete\n\nPR: <pr_url>\n\n### Acceptance Criteria\n- [x] ...\n\n### Changes\n- <file>: <what changed>\n\nReady for: `/trazador:review ISSUE-XX`")
+   mcp__linear-server__save_comment(issueId: <issue_id>, body: "## Work Complete\n\nPR: <pr_url>\n\n### Acceptance Criteria\n- [x] ...\n\n### Sub-Issues\n| Sub-Issue | Title | Status |\n|-----------|-------|--------|\n| ISSUE-31 | <title> | In Review |\n\n### Changes\n- <file>: <what changed>\n\nReady for: `/trazador:review ISSUE-XX`")
    ```
 
-4. **Link PR to issue:**
+5. **If epic (has sub-issues)** — post completion comment on each sub-issue:
+   ```
+   mcp__linear-server__save_comment(issueId: <sub_issue_id>, body: "## Work Complete\n\nPR: <pr_url>\nParent: ISSUE-XX\n\nAll criteria implemented. Awaiting review.")
+   ```
+
+6. **Link PR to issue:**
    ```
    mcp__linear-server__save_issue(id: <issue_id>, links: [{ url: "<pr_url>", title: "PR: <pr_title>" }])
    ```
 
-5. **Present to user:**
+7. **Present to user:**
    ```
    Work complete on ISSUE-XX: <title>
 
    PR: <pr_url>
    All acceptance criteria met.
+
+   Sub-issues: [list with status if epic]
 
    Next: /trazador:review ISSUE-XX
    ```
