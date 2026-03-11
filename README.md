@@ -1,98 +1,73 @@
-# Trazador
+# trazador
 
-Linear-native agent workflow for Claude Code. Plan, build, review, and sync — with Linear as the single source of truth.
-
-## What it does
-
-Trazador connects AI coding agents (Claude Code, Codex) to Linear so every task is traceable from requirement to shipped code. No local task files, no competing trackers.
-
-| Command | Purpose |
-|---------|---------|
-| `/trazador:init` | One-time setup — bind project to Linear team and project |
-| `/trazador:discovery` | Analyze code vs Linear, find gaps, help define scope |
-| `/trazador:plan` | Define a feature, break it down, create Linear issues |
-| `/trazador:work` | Pick up an issue, implement it, ship a PR |
-| `/trazador:review` | Validate implementation against the spec, then technical review |
-| `/trazador:sync` | Keep Linear in sync, check project health |
-| `/trazador:autopilot` | Autonomous mode — supervisor dispatches teammate agents per issue |
-
-## Install
+Connect your AI coding agent to your PM tool. Every task is traceable from issue to shipped PR.
 
 ```bash
-# From local path (development)
-claude --plugin-dir /path/to/trazador
-
-# Or add marketplace (when published)
-# /plugin marketplace add jefernandez/trazador
+npx trazador
 ```
 
-## Setup
+Works with **Claude Code** and **Codex CLI**. Supports **Linear**.
 
-After installing, run in any project:
+## How it works
 
-```
-/trazador:init
-```
-
-This will:
-1. Validate Linear MCP connection (bundled with the plugin)
-2. Ask which Linear team and project to use
-3. Create `.trazador/config.yaml` in your project
-4. Optionally update your `AGENTS.md`
-
-## Workflow
+**Step 1** — Run the installer. Pick your scope (project or global) and agent.
 
 ```
-/trazador:init          → Setup (once per project)
-/trazador:discovery     → "Where are we? What's missing?"
-/trazador:plan          → "Define this specific feature"
-/trazador:work ISSUE-XX → "Build it"
-/trazador:review ISSUE-XX → "Did we build the right thing?"
-/trazador:sync          → "Keep everything in sync"
-/trazador:autopilot     → "Work through the backlog autonomously"
+$ npx trazador
+
+▸ trazador setup
+
+Where should trazador be installed?
+  ● This project only
+  ○ Global (all projects)
+
+Which agent runtime?
+  ● Claude Code
+  ○ Codex CLI
+  ○ Both
+
+✓ Trazador installed successfully
+  Scope: This project
+  Agent: Claude Code
+  PM Tool: Linear
 ```
 
-## Autopilot Mode
+**Step 2** — Inside your agent, run `/trazador:init` to connect to Linear (OAuth), pick a team/project, and map workflow statuses.
 
+## Commands
+
+| Command | What it does |
+|---------|-------------|
+| `/trazador:init` | Connect to Linear, select team/project |
+| `/trazador:discovery` | Analyze codebase vs backlog, find gaps |
+| `/trazador:plan` | Define a feature, break it into issues |
+| `/trazador:work` | Pick up an issue, implement, open a PR |
+| `/trazador:review` | Validate implementation against the spec |
+| `/trazador:sync` | Keep Linear in sync, check project health |
+| `/trazador:autopilot` | Supervisor dispatches agents per issue |
+
+## Flags
+
+Skip the interactive prompts:
+
+```bash
+npx trazador --scope project --agent claude
+npx trazador --agent both
 ```
-/trazador:autopilot 5 autopilot-ready
+
+## Uninstall
+
+```bash
+npx trazador uninstall
 ```
 
-Runs a lightweight supervisor that:
-1. Reads Todo issues from Linear (optionally filtered by label)
-2. Spawns a **teammate agent** per issue (fresh context, full window)
-3. Teammate does the full cycle: branch → code → test → PR → self-review
-4. Supervisor logs results, picks the next issue
-5. Posts a session summary to Linear
-
-```
-┌─────────────────────────────┐
-│  Autopilot (supervisor)     │  ← tiny context, just dispatch + track
-│  for each Todo issue:       │
-│    spawn teammate(issue_id) │──→ ┌──────────────────────────┐
-│    log result               │    │  Teammate (worker agent)  │
-│  end                        │    │  Full context per issue   │
-└─────────────────────────────┘    │  work → test → PR → review│
-                                   └──────────────────────────┘
-```
-
-## How it differs from Task Master
-
-| | Trazador | Task Master |
-|---|---|---|
-| Task storage | Linear (cloud) | Local files (.taskmaster/) |
-| Source of truth | Linear issues | tasks.json |
-| PM tool | Linear-native | None |
-| Review | Goal-aligned validation | None |
-| Scope | Full lifecycle | Task decomposition |
-
-Trazador is for teams that use Linear. Task Master is for solo AI-driven development with local files.
+Removes all trazador files. Non-trazador config is preserved.
 
 ## Requirements
 
-- Claude Code
-- Linear account (free tier works)
-- Linear MCP server (bundled with plugin)
+- Node.js 18+
+- Claude Code or Codex CLI
+- Linear account
 
 ## License
 
