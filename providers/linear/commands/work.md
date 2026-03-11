@@ -43,7 +43,12 @@ Use **AskUserQuestion**: "This issue doesn't have clear acceptance criteria. Sho
 
 ### Phase 2: Plan & Confirm
 
-1. **Quick repo research** — read the files referenced in the issue's approach section
+1. **Deep repo research** — load the `trazador-research` skill and follow its methodology:
+   - **File Mapping**: Read every file in the Approach section. Extract patterns, naming, error handling, test patterns.
+   - **Reuse Discovery**: Search for existing utilities, helpers, base classes, and types to reuse.
+   - **Convention Extraction**: Read 2-3 similar files to establish conventions.
+   - **Implementation Brief**: For each criterion, map: where to implement, what pattern to follow, what to reuse, where to test.
+   - Skip if the issue's Approach already contains specific `file:line` references with pattern descriptions.
 2. **Create a brief execution plan** (not written anywhere — just communicated):
    ```
    I'll work on ISSUE-XX: <title>
@@ -113,16 +118,25 @@ For each sub-issue:
 
 Sub-issues transition independently: a sub-issue moves to "In Review" as soon as its work is committed, even while other sub-issues are still "In Progress".
 
-**If regular issue (no sub-issues)** — loop over acceptance criteria:
+**If regular issue (no sub-issues)** — load the `trazador-tdd` skill and follow its adaptive methodology:
 
 ```
-For each acceptance criterion:
-  1. Read referenced files from the issue approach
-  2. Look for similar patterns in codebase (grep/glob)
-  3. Implement following existing conventions
-  4. Write tests for new functionality
-  5. Run tests after changes
-  6. Commit when a logical unit is complete
+Step 1: Detect test framework (jest, vitest, pytest, rspec, go test, etc.)
+  - If no framework: skip TDD, implement directly, verify manually in Phase 5
+
+Step 2 (if framework exists): For each acceptance criterion:
+  a. RED — Write a failing test from the criterion (follow project test conventions)
+  b. Run tests — confirm failure for the right reason
+  c. GREEN — Implement minimum code to pass the test
+  d. Run tests — confirm pass
+  e. REFACTOR — clean up if needed (keep tests green)
+  f. Commit when a logical unit is complete
+
+Step 2 (if no framework): For each acceptance criterion:
+  a. Read referenced files from the issue approach
+  b. Look for similar patterns in codebase (grep/glob)
+  c. Implement following existing conventions
+  d. Commit when a logical unit is complete
 ```
 
 **Commit guidelines:**
@@ -153,28 +167,37 @@ For each acceptance criterion:
 
 1. **Run the project's test suite** (discover the test commands from package.json, Makefile, or similar)
 2. **Run type checking** if the project uses TypeScript or similar
-3. **Verify all acceptance criteria** — check each one explicitly:
+3. **Independent Acceptance Verification** — spawn an Acceptance Verifier agent to check criteria with a fresh perspective (prevents self-grading bias):
 
-   **If epic (has sub-issues)** — verify per sub-issue:
    ```
-   Sub-issue ISSUE-31 (<title>):
-     - [x] Criterion 1 — verified by: <how>
-     - [x] Criterion 2 — verified by: <how>
+   Agent(
+     subagent_type: "general-purpose",
+     description: "Verify acceptance criteria for <issue_id>",
+     prompt: "
+       You are an independent acceptance criteria verifier. You did NOT write this code.
 
-   Sub-issue ISSUE-32 (<title>):
-     - [x] Criterion 1 — verified by: <how>
-     - [ ] Criterion 2 — NOT MET: <why>
+       Original acceptance criteria (from Linear issue):
+       <paste all acceptance criteria here>
+
+       Review the code changes by running: git diff main...HEAD
+
+       For each criterion:
+       1. Read the criterion carefully
+       2. Search the diff for evidence that it's implemented
+       3. Verify edge cases mentioned in the criterion are handled
+       4. Check if tests exist that exercise this criterion
+
+       Report per criterion:
+       - PASS: Implemented with evidence (cite file:line)
+       - FAIL: Not implemented or incomplete (explain what's missing)
+       - PARTIAL: Partially implemented (explain the gap)
+
+       If any criterion is FAIL, list exactly what code changes are needed to fix it.
+     "
+   )
    ```
 
-   **If regular issue (no sub-issues):**
-   ```
-   Acceptance Criteria Verification:
-   - [x] Criterion 1 — verified by: <how>
-   - [x] Criterion 2 — verified by: <how>
-   - [ ] Criterion 3 — NOT MET: <why>
-   ```
-
-4. **If any criterion is not met**, fix it before proceeding. If it can't be met, use **AskUserQuestion** to discuss.
+4. **If the verifier reports any FAIL criteria**, fix them before proceeding. If a criterion can't be met, use **AskUserQuestion** to discuss.
 
 ### Phase 6: Ship It
 
@@ -184,10 +207,12 @@ For each acceptance criterion:
      mcp__linear-server__save_issue(id: <sub_issue_id>, state: <config.linear.statuses.in_review>)
      ```
 
-2. **Create PR:**
+2. **Push and create PR:**
    ```bash
    git push -u origin <branch_name>
    ```
+
+   After pushing, tell the user the branch is ready and provide a PR creation link. Do NOT assume `gh` CLI or any external tools are installed — only use `git`.
 
    PR title: `<type>(<scope>): <description> (ISSUE-XX)`
 

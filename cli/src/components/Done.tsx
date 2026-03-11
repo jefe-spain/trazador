@@ -1,14 +1,15 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { agentLabels } from "../types.js";
-import type { Scope, Agent } from "../types.js";
+import { agentLabels, toolLabels } from "../types.js";
+import type { Scope, Agent, Tool } from "../types.js";
 
 interface DoneProps {
   scope: Scope;
   agent: Agent;
+  tool: Tool;
 }
 
-export function Done({ scope, agent }: DoneProps) {
+export function Done({ scope, agent, tool }: DoneProps) {
   const agents = agent === "both" ? ["claude", "codex"] : [agent];
   const scopeDisplay = scope === "global" ? "Global" : "This project";
 
@@ -33,7 +34,7 @@ export function Done({ scope, agent }: DoneProps) {
           </Text>
           <Text>
             <Text dimColor>{"PM Tool  "}</Text>
-            <Text bold>Linear</Text>
+            <Text bold>{toolLabels[tool]}</Text>
           </Text>
         </Box>
 

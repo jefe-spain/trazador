@@ -2,11 +2,12 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
-import type { Scope, Agent } from "./types.js";
+import type { Scope, Agent, Tool } from "./types.js";
 
 interface InstallOptions {
   scope: Scope;
   agent: Agent;
+  tool: Tool;
   cwd: string;
   onStep: (msg: string) => void;
 }
@@ -39,6 +40,7 @@ function codexRoot(scope: Scope, cwd: string): string {
 export async function install({
   scope,
   agent,
+  tool,
   cwd,
   onStep,
 }: InstallOptions): Promise<void> {
@@ -48,22 +50,35 @@ export async function install({
   const scopeLabel = scope === "global" ? "globally" : "for this project";
   onStep(`Installing ${scopeLabel}`);
 
-  const providerDir = path.join(packageRoot, "providers", "linear");
+  const providerDir = path.join(packageRoot, "providers", tool);
   await ensureProviderExists(providerDir);
 
-  for (const ag of agents) {
-    if (ag === "claude") {
-      await installClaude({ scope, cwd, onStep });
-    } else {
-      await installCodex({ scope, cwd, onStep });
-    }
-  }
-
-  // Write installation metadata
+  // Detect existing install and clean up if switching providers
   const metaDir =
     scope === "global"
       ? path.join(homeDir, ".trazador")
       : path.join(cwd, ".trazador");
+  const existingMetaPath = path.join(metaDir, "meta.json");
+  if (await fileExists(existingMetaPath)) {
+    const existingMeta = JSON.parse(
+      await fs.readFile(existingMetaPath, "utf-8"),
+    );
+    const existingTool = existingMeta.tools?.[0] ?? "linear";
+    if (existingTool !== tool || existingMeta.agent !== agent) {
+      onStep(`Removing previous install (${existingTool}/${existingMeta.agent ?? "unknown"})`);
+      await uninstall({ cwd, onStep: () => {} });
+    }
+  }
+
+  for (const ag of agents) {
+    if (ag === "claude") {
+      await installClaude({ scope, tool, cwd, onStep });
+    } else {
+      await installCodex({ scope, tool, cwd, onStep });
+    }
+  }
+
+  // Write installation metadata
   onStep("Writing installation metadata");
   await fs.mkdir(metaDir, { recursive: true });
 
@@ -71,7 +86,7 @@ export async function install({
   const meta = {
     scope,
     agent,
-    tools: ["linear"],
+    tools: [tool],
     installed_at: new Date().toISOString(),
     version,
   };
@@ -137,24 +152,27 @@ export async function uninstall({
 
 async function installClaude({
   scope,
+  tool,
   cwd,
   onStep,
 }: {
   scope: Scope;
+  tool: Tool;
   cwd: string;
   onStep: (msg: string) => void;
 }): Promise<void> {
   const root = claudeRoot(scope, cwd);
-  const providerDir = path.join(packageRoot, "providers", "linear");
+  const providerDir = path.join(packageRoot, "providers", tool);
 
   // Copy commands -> commands/trazador/*.md
-  onStep("Installing Linear commands");
+  const toolName = tool.charAt(0).toUpperCase() + tool.slice(1);
+  onStep(`Installing ${toolName} commands`);
   const srcCommands = path.join(providerDir, "commands");
   const destCommands = path.join(root, "commands", "trazador");
   await copyDir(srcCommands, destCommands);
 
-  // Copy skills -> skills/trazador/SKILL.md
-  onStep("Installing Linear skills");
+  // Copy skills -> skills/ (trazador/, trazador-spec-validation/, trazador-research/, trazador-tdd/)
+  onStep(`Installing ${toolName} skills`);
   const srcSkills = path.join(providerDir, "skills");
   const destSkills = path.join(root, "skills");
   await copyDir(srcSkills, destSkills);
@@ -189,16 +207,19 @@ async function installClaude({
 
 async function installCodex({
   scope,
+  tool,
   cwd,
   onStep,
 }: {
   scope: Scope;
+  tool: Tool;
   cwd: string;
   onStep: (msg: string) => void;
 }): Promise<void> {
   const root = codexRoot(scope, cwd);
-  const providerDir = path.join(packageRoot, "providers", "linear");
+  const providerDir = path.join(packageRoot, "providers", tool);
 
+  const toolName = tool.charAt(0).toUpperCase() + tool.slice(1);
   onStep("Setting up Codex CLI configuration");
 
   // 1. AGENTS.md (project scope only)
@@ -213,8 +234,8 @@ async function installCodex({
 
     if (await fileExists(codexTemplate)) {
       let content = await fs.readFile(codexTemplate, "utf-8");
-      content = content.replace(/\{\{tool\}\}/g, "linear");
-      content = content.replace(/\{\{tool_name\}\}/g, "Linear");
+      content = content.replace(/\{\{tool\}\}/g, tool);
+      content = content.replace(/\{\{tool_name\}\}/g, toolName);
 
       if (await fileExists(destAgents)) {
         const existing = await fs.readFile(destAgents, "utf-8");
@@ -231,12 +252,13 @@ async function installCodex({
     }
   }
 
-  // 2. Install skills from provider
+  // 2. Install skills from provider (commands as skills + dedicated skill files)
   const skillsRoot = scope === "global" ? root : cwd;
-  const srcCommands = path.join(providerDir, "commands");
 
+  // 2a. Copy command files as skills (trazador-init, trazador-plan, etc.)
+  const srcCommands = path.join(providerDir, "commands");
   if (await fileExists(srcCommands)) {
-    onStep("Installing Linear skills for Codex");
+    onStep(`Installing ${toolName} skills for Codex`);
     const entries = await fs.readdir(srcCommands);
     for (const entry of entries) {
       if (!entry.endsWith(".md")) continue;
@@ -252,6 +274,22 @@ async function installCodex({
         path.join(srcCommands, entry),
         path.join(skillDir, "SKILL.md"),
       );
+    }
+  }
+
+  // 2b. Copy dedicated skill files (trazador-spec-validation, trazador-research, trazador-tdd, etc.)
+  const srcSkills = path.join(providerDir, "skills");
+  if (await fileExists(srcSkills)) {
+    const skillEntries = await fs.readdir(srcSkills, { withFileTypes: true });
+    for (const entry of skillEntries) {
+      if (!entry.isDirectory()) continue;
+      const skillDir = path.join(
+        skillsRoot,
+        ".agents",
+        "skills",
+        entry.name,
+      );
+      await copyDir(path.join(srcSkills, entry.name), skillDir);
     }
   }
 
@@ -276,15 +314,15 @@ async function installCodex({
         continue;
       }
       if (inTrazadorSection) {
-        // End of trazador block: next non-trazador [section] or another comment block
+        // End of trazador block: any [section] that isn't an MCP server definition
         if (
           line.startsWith("[") &&
-          !line.startsWith("[mcp_servers.linear-server")
+          !line.startsWith("[mcp_servers.")
         ) {
           inTrazadorSection = false;
           kept.push(line);
         }
-        // skip trazador lines
+        // skip trazador lines (including mcp_servers.* within the block)
         continue;
       }
       kept.push(line);
@@ -295,7 +333,7 @@ async function installCodex({
   const mcpSrc = path.join(providerDir, "mcp.json");
   const tomlLines: string[] = [
     "# Trazador MCP configuration for Codex CLI",
-    "# PM Tool: Linear",
+    `# PM Tool: ${toolName}`,
     "",
   ];
 
@@ -308,6 +346,13 @@ async function installCodex({
 
       if (cfg.type === "http" && cfg.url) {
         tomlLines.push(`url = "${cfg.url}"`);
+        // Codex-specific: bearer_token_env_var for PAT-based auth
+        const codexCfg = cfg.codex as Record<string, string> | undefined;
+        if (codexCfg?.bearer_token_env_var) {
+          tomlLines.push(
+            `bearer_token_env_var = "${codexCfg.bearer_token_env_var}"`,
+          );
+        }
       } else if (cfg.command) {
         tomlLines.push(`command = "${cfg.command}"`);
         if (Array.isArray(cfg.args)) {
@@ -361,16 +406,24 @@ async function removeClaude(
     onStep("Removed trazador commands");
   }
 
-  // Remove skills/trazador/ directory
-  const skillsDir = path.join(root, "skills", "trazador");
-  if (await fileExists(skillsDir)) {
-    await fs.rm(skillsDir, { recursive: true });
-    const parentSkills = path.join(root, "skills");
-    const remaining = await fs.readdir(parentSkills);
-    if (remaining.length === 0) {
-      await fs.rm(parentSkills, { recursive: true });
+  // Remove all trazador skill directories (trazador/, trazador-spec-validation/, trazador-research/, trazador-tdd/)
+  const parentSkills = path.join(root, "skills");
+  if (await fileExists(parentSkills)) {
+    const skillEntries = await fs.readdir(parentSkills);
+    let removedAny = false;
+    for (const entry of skillEntries) {
+      if (entry.startsWith("trazador")) {
+        await fs.rm(path.join(parentSkills, entry), { recursive: true });
+        removedAny = true;
+      }
     }
-    onStep("Removed trazador skills");
+    if (removedAny) {
+      const remaining = await fs.readdir(parentSkills);
+      if (remaining.length === 0) {
+        await fs.rm(parentSkills, { recursive: true });
+      }
+      onStep("Removed trazador skills");
+    }
   }
 
   // Clean up empty .claude/ directory
@@ -497,16 +550,11 @@ async function removeCodex(
 
   if (await fileExists(configTomlPath)) {
     const content = await fs.readFile(configTomlPath, "utf-8");
-    // Remove trazador-managed MCP sections
+    // Remove trazador-managed MCP sections (provider-agnostic)
     let cleaned = content;
-    // Remove the trazador comment block and linear-server section
+    // Remove the entire trazador block: from comment header to next non-trazador section or EOF
     cleaned = cleaned.replace(
-      /# Trazador MCP configuration[\s\S]*?(?=\[(?!mcp_servers\.linear)|$)/g,
-      "",
-    );
-    // Also remove any remaining linear-server section
-    cleaned = cleaned.replace(
-      /\[mcp_servers\.linear-server\][\s\S]*?(?=\[|$)/g,
+      /# Trazador MCP configuration[\s\S]*?(?=\n\[(?!mcp_servers\.)|\n#(?! (?:Trazador|PM Tool))|\s*$)/g,
       "",
     );
     cleaned = cleaned.replace(/# PM Tool.*\n/g, "");
@@ -555,7 +603,7 @@ async function removeCodex(
 async function ensureProviderExists(providerDir: string): Promise<void> {
   if (!(await fileExists(providerDir))) {
     throw new Error(
-      `Linear provider not found at ${providerDir}`,
+      `Provider not found at ${providerDir}`,
     );
   }
 }

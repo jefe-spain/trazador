@@ -1,12 +1,12 @@
 ---
 name: trazador:init
-description: One-time project setup — configure GitHub Issues workspace, validate MCP access, create .trazador/config.yaml
+description: One-time project setup — configure GitHub MCP with PAT, validate access, create .trazador/config.yaml
 argument-hint: ""
 ---
 
 # Trazador Init — Project Setup Wizard (GitHub Issues)
 
-One-time interactive setup that binds this repository to GitHub Issues and configures the trazador workflow.
+One-time interactive setup that configures the GitHub MCP server, binds this repository to GitHub Issues, and creates the trazador workflow config.
 
 ## Input
 
@@ -25,28 +25,63 @@ Before starting, check if `.trazador/config.yaml` already exists:
 
 ## Execution Flow
 
-### Phase 1: Ensure GitHub MCP is Available
+### Phase 1: Configure GitHub MCP Authentication
 
-Trazador requires the GitHub MCP server (`github`). This phase ensures it's working.
+The GitHub MCP server requires a Personal Access Token (PAT). This phase ensures it's set up.
 
-1. Attempt to call `mcp__github__list_issues()` or equivalent
-2. **If it succeeds:** Tell user "GitHub MCP is connected."
-3. **If it fails:**
-   - The MCP may need a `GITHUB_TOKEN` environment variable
-   - Tell the user:
-     ```
-     GitHub MCP is not responding.
+1. **Test MCP connectivity** — attempt to call any GitHub MCP tool (e.g., `mcp__github__list_issues`)
+2. **If it works:** Tell user "GitHub MCP is connected." Skip to Phase 2.
+3. **If it fails** — the MCP needs authentication:
 
-     Ensure you have a GITHUB_TOKEN environment variable set.
-     You can create a token at: https://github.com/settings/tokens
+   Ask the user for their GitHub PAT:
+   ```
+   GitHub MCP needs a Personal Access Token (PAT) to authenticate.
 
-     If the plugin MCP didn't load, you can add it manually:
-       claude mcp add github -- npx -y @modelcontextprotocol/server-github
+   Create one at: https://github.com/settings/personal-access-tokens/new
 
-     Set the env var:
-       export GITHUB_TOKEN=ghp_...
-     ```
-   - Ask: "Would you like to retry, continue without GitHub (config only), or stop?"
+   Required scopes: repo, workflow (optional), read:org (optional)
+
+   Paste your PAT:
+   ```
+
+   Once the user provides the PAT:
+
+   a. **Update `.mcp.json`** — read the existing file, add the Authorization header to the `github` server:
+      ```json
+      {
+        "mcpServers": {
+          "github": {
+            "type": "http",
+            "url": "https://api.githubcopilot.com/mcp/",
+            "headers": {
+              "Authorization": "Bearer <PAT>"
+            }
+          }
+        }
+      }
+      ```
+
+   b. **For Codex** — if `.codex/config.toml` exists, tell the user:
+      ```
+      For Codex CLI, set the environment variable:
+        export GITHUB_PAT_TOKEN=<PAT>
+
+      And ensure .codex/config.toml has:
+        [mcp_servers.github]
+        url = "https://api.githubcopilot.com/mcp/"
+        bearer_token_env_var = "GITHUB_PAT_TOKEN"
+      ```
+
+   c. **Tell user to restart the agent** so the MCP reloads with the new config, then retry.
+
+   d. **Verify** — attempt the MCP call again. If still failing, suggest troubleshooting:
+      ```
+      Still not connecting. Check:
+      1. PAT has 'repo' scope
+      2. PAT hasn't expired
+      3. Agent was restarted after config change
+      4. Run: claude mcp list (should show 'github' server)
+      ```
 
 ### Phase 2: Detect Repository
 
@@ -55,31 +90,41 @@ Trazador requires the GitHub MCP server (`github`). This phase ensures it's work
    git remote get-url origin
    ```
 2. Parse the owner and repo name
-3. Confirm with user: "Using repository: <owner>/<repo>. Correct?"
+3. Confirm with user: "Using repository: **owner/repo**. Correct?"
 
 **Store:** `owner`, `repo`
 
-### Phase 3: Configure Labels & Milestones
+### Phase 3: Configure Labels
 
 1. Fetch existing labels from the repo via GitHub MCP
 2. Map trazador standard statuses to GitHub labels:
-   - `backlog` → label "backlog"
-   - `todo` → label "todo" or no label (just open)
+   - `todo` → label "todo" (or just open, no label)
    - `in_progress` → label "in-progress"
    - `in_review` → label "in-review"
    - `done` → closed issue
-3. Create missing labels if user agrees
-4. Check for GitHub Projects (if used) as an alternative status tracking
+3. Create missing labels if user agrees:
+   ```
+   These labels are needed for trazador workflow:
+   - "in-progress" (missing — create it?)
+   - "in-review" (missing — create it?)
+   ```
 
-**Store:** `labels`, `use_projects` (boolean)
+**Store:** `labels`
 
 ### Phase 4: Configure Source of Truth
 
-Ask: Jira-only equivalent → "GitHub-only" or "Hybrid"
+Ask using **AskUserQuestion**:
+
+```
+Where should specs and planning live?
+
+1. GitHub-only — all specs in GitHub Issues, no local files
+2. Hybrid — specs in GitHub Issues, local notes in docs/
+```
 
 ### Phase 5: Write Configuration
 
-Create `.trazador/config.yaml` with:
+Create `.trazador/config.yaml`:
 
 ```yaml
 # Trazador Configuration
@@ -94,12 +139,9 @@ github:
   owner: "<owner>"
   repo: "<repo>"
   labels:
-    backlog: "backlog"
     todo: "todo"
     in_progress: "in-progress"
     in_review: "in-review"
-  use_projects: true|false
-  project_id: "<id if using projects>"
 
 workflow:
   source_of_truth: "github-only"|"hybrid"
@@ -109,10 +151,20 @@ initialized_at: "YYYY-MM-DDTHH:MM:SSZ"
 
 ### Phase 6: Validation & Summary
 
-Present the configuration summary and available commands.
+```
+Trazador configured for GitHub Issues.
+
+  Repository:  owner/repo
+  MCP:         connected
+  Labels:      todo, in-progress, in-review
+
+Next: /trazador:plan "your feature idea"
+  or: /trazador:work #42
+```
 
 ## Important Guidelines
 
 - **NEVER write code** — this command only configures
-- **Non-destructive** — never overwrite existing content
-- **Idempotent** — running init twice updates config
+- **Non-destructive** — never overwrite existing `.mcp.json` entries from other servers
+- **Idempotent** — running init twice updates config, doesn't duplicate
+- **Security** — never log or echo the PAT after the user provides it

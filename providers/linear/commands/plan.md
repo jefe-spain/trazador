@@ -88,6 +88,18 @@ Write a structured issue description in markdown:
 - Approach section must reference **specific files** from repo research
 - Out of Scope is mandatory — forces discipline on boundaries
 
+### Phase 2.5: Validate the Spec
+
+Before creating issues, load the `trazador-spec-validation` skill and follow its methodology:
+
+1. **Feasibility Check** — for each acceptance criterion, verify the codebase can support it. Flag criteria needing foundation work not covered in the Approach.
+2. **Criteria Quality** — each criterion must be observable, testable, and unambiguous. Rewrite vague criteria.
+3. **Flow Completeness** — trace the user flow end-to-end. Identify missing steps, error states, and edge cases.
+
+Present the validation table to the user. Apply any rewrites, splits, or additions before proceeding.
+
+If any criteria **Need Foundation**, add prerequisite steps to the Approach or suggest splitting into a separate issue.
+
 ### Phase 3: Decide Issue Structure
 
 Based on complexity assessment from Phase 1:

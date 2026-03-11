@@ -107,28 +107,44 @@ Your task: implement Linear issue {issue_id}.
    - mcp__linear-server__get_issue(id: "{issue_id}", includeRelations: true)
    - mcp__linear-server__list_comments(issueId: "{issue_id}")
 4. Read the issue description — it IS the spec.
-5. Plan your implementation, then execute:
+5. **Research before coding** — load the `trazador-research` skill and follow its methodology:
+   - Map every file in the Approach section (patterns, naming, error handling)
+   - Search for reusable utilities, helpers, base classes
+   - Read 2-3 similar files to extract conventions
+   - Create an implementation brief: for each criterion, map where to implement, what to reuse, what pattern to follow
+   - Skip if the Approach already has specific file:line references with pattern descriptions
+6. Plan your implementation, then execute:
    - Update Linear status to In Progress
    - Create a branch
-   - Implement each acceptance criterion
-   - Write tests
+   - **Use adaptive TDD** — load the `trazador-tdd` skill:
+     - Detect test framework. If none exists, implement directly.
+     - If framework exists: for each criterion, write a failing test (RED), implement to pass (GREEN), refactor if needed.
    - Commit incrementally with conventional messages referencing {issue_id}
    - Run the test suite
-6. When all criteria are met:
+7. **Independent acceptance verification** — before shipping, spawn an Acceptance Verifier agent:
+   ```
+   Agent(
+     subagent_type: "general-purpose",
+     description: "Verify criteria for {issue_id}",
+     prompt: "You are an independent verifier. You did NOT write this code. Check `git diff main...HEAD` against these acceptance criteria: <criteria>. For each: PASS (cite file:line), FAIL (what's missing), or PARTIAL (the gap)."
+   )
+   ```
+   Fix any FAIL criteria before proceeding.
+8. When all criteria verified:
    - Push the branch
    - Create a PR with structured body (Summary, Acceptance Criteria, Testing)
    - Update Linear status to In Review
    - Post a completion comment on the issue
-7. Self-review:
-   - Check each acceptance criterion against your code
+9. Self-review:
    - Check scope boundaries (nothing extra, nothing missing)
-   - If all criteria MET and no issues found, approve the PR and move issue to Done
+   - If all criteria MET and no issues found, move issue to Done in Linear
    - If issues found, note them in the PR and leave status as In Review
 
 ## Rules
 - The issue IS the spec. Do not invent requirements.
 - Simplest path — minimum code to meet acceptance criteria.
-- Test as you go.
+- Research first, then code. Never guess when you can grep.
+- Test as you go (if the project has tests).
 - If the issue is unclear or blocked, update Linear with a "Blocked" comment and return "blocked".
 - Do not ask questions — either figure it out from the issue/code or mark as blocked.
 - Always update Linear at every state transition.

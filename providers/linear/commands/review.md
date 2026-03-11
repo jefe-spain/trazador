@@ -32,11 +32,10 @@ Run these in parallel:
 
 1. **Fetch the Linear issue** — `mcp__linear-server__get_issue` with `includeRelations: true`
 2. **Fetch issue comments** — `mcp__linear-server__list_comments` for planning notes and work log
-3. **Get the PR diff** — find the linked PR from issue data or comments, then:
+3. **Get the code changes** — determine the branch from issue data or comments, then:
    ```bash
-   # Find PR number from branch or issue links
-   gh pr list --head <branch_name> --json number,url,title,body
-   gh pr diff <pr_number>
+   git fetch origin
+   git diff main...<branch_name>
    ```
 
 **Extract the review contract:**
@@ -75,28 +74,108 @@ One of:
 
 ### Phase 3: Technical Review
 
-Run curated review agents **in parallel** using the Agent tool:
+Run **3 self-contained review agents in parallel** using the Agent tool. No external plugin dependencies — all prompts are inline.
 
-1. **Pattern Recognition** — Does the code follow established codebase patterns?
-   - Task compound-engineering:review:pattern-recognition-specialist(pr_diff)
+Launch all 3 agents simultaneously:
 
-2. **Code Simplicity** — Is the code as simple as possible? No YAGNI violations?
-   - Task compound-engineering:review:code-simplicity-reviewer(pr_diff)
+**1. Security Auditor:**
 
-3. **Security Sentinel** — Any vulnerabilities, input validation gaps, auth issues?
-   - Task compound-engineering:review:security-sentinel(pr_diff)
+```
+Agent(
+  subagent_type: "general-purpose",
+  description: "Security audit for <issue_id>",
+  prompt: "
+    You are a security auditor reviewing a pull request.
 
-4. **Performance Oracle** — Any N+1 queries, missing indexes, memory issues?
-   - Task compound-engineering:review:performance-oracle(pr_diff)
+    Run `git diff main...HEAD` to get the code changes.
 
-**Conditional agents (only when relevant):**
+    Check for:
+    1. Injection vulnerabilities (SQL, command, XSS, template)
+    2. Authentication/authorization gaps (missing auth checks, privilege escalation)
+    3. Input validation (untrusted data used without validation)
+    4. Secrets/credentials (hardcoded keys, tokens, passwords)
+    5. Data exposure (sensitive data in logs, error messages, API responses)
+    6. Insecure dependencies (known vulnerable patterns)
 
-| Condition | Agent |
-|-----------|-------|
-| PR touches database migrations | compound-engineering:review:data-integrity-guardian |
-| PR touches frontend JS | compound-engineering:review:julik-frontend-races-reviewer |
-| PR adds API endpoints | compound-engineering:review:agent-native-reviewer |
-| PR has architectural changes | compound-engineering:review:architecture-strategist |
+    For each finding:
+    - Severity: P1 (exploitable) / P2 (potential risk) / P3 (hardening)
+    - File and line number
+    - What the vulnerability is
+    - How to fix it
+
+    If no security issues found, state 'No security findings.'
+  "
+)
+```
+
+**2. Quality Reviewer:**
+
+```
+Agent(
+  subagent_type: "general-purpose",
+  description: "Quality review for <issue_id>",
+  prompt: "
+    You are a code quality reviewer. Review this PR for three concerns.
+
+    Run `git diff main...HEAD` to get the code changes.
+    Read 2-3 existing files in the same directory as the changes to understand codebase patterns.
+
+    ## 1. Pattern Conformance
+    - Does new code match existing patterns in the codebase?
+    - Naming conventions, file organization, error handling style
+    - Flag deviations from established patterns
+
+    ## 2. Simplicity (YAGNI)
+    - Is anything over-engineered for the stated acceptance criteria?
+    - Are there abstractions that aren't needed yet?
+    - Could any part be simpler while still meeting the spec?
+
+    ## 3. Performance
+    - N+1 query patterns
+    - Missing database indexes for new queries
+    - Unnecessary memory allocation or computation
+    - Blocking operations that could be async
+
+    For each finding:
+    - Severity: P1 (will cause problems) / P2 (should fix) / P3 (suggestion)
+    - File and line number
+    - What the issue is
+    - How to fix it
+
+    If no issues found in a category, state 'No findings.'
+  "
+)
+```
+
+**3. Acceptance Verifier:**
+
+```
+Agent(
+  subagent_type: "general-purpose",
+  description: "Verify acceptance criteria for <issue_id>",
+  prompt: "
+    You are an independent acceptance criteria verifier. You did NOT write this code.
+
+    Original acceptance criteria (from Linear issue):
+    <paste all acceptance criteria here>
+
+    Run `git diff main...HEAD` to get the code changes.
+
+    For each criterion:
+    1. Read the criterion carefully
+    2. Search the diff for evidence that it's implemented
+    3. Verify edge cases mentioned in the criterion are handled
+    4. Check if tests exist that exercise this criterion
+
+    Report per criterion:
+    - PASS: Implemented with evidence (cite file:line)
+    - FAIL: Not implemented or incomplete (explain what's missing)
+    - PARTIAL: Partially implemented (explain the gap)
+
+    If any criterion is FAIL, list exactly what code changes are needed to fix it.
+  "
+)
+```
 
 ### Phase 4: Synthesize Findings
 
@@ -159,10 +238,8 @@ Combine goal alignment and technical review into a single report.
    | REQUEST CHANGES | State stays <config.linear.statuses.in_review>, comment lists what to fix |
    | DISCUSS | State stays <config.linear.statuses.in_review>, comment flags points for PM decision |
 
-3. **If APPROVE, also approve the PR:**
-   ```bash
-   gh pr review <pr_number> --approve --body "Trazador review passed. Goal aligned, technical checks clear."
-   ```
+3. **If APPROVE:**
+   - Tell the user: "Review passed. PR is ready to merge."
 
 4. **If APPROVE and epic (has sub-issues)** — move all sub-issues to "Done":
    - Fetch sub-issues: `mcp__linear-server__list_issues` with `parentId: <issue_id>`
@@ -173,9 +250,7 @@ Combine goal alignment and technical review into a single report.
      ```
 
 5. **If REQUEST CHANGES:**
-   ```bash
-   gh pr review <pr_number> --request-changes --body "See Linear comment on ISSUE-XX for details."
-   ```
+   - Tell the user: "Changes required — see findings above."
 
 6. **Present to user:**
    ```

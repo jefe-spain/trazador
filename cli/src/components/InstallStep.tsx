@@ -2,15 +2,16 @@ import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
 import { Spinner } from "@inkjs/ui";
 import { install } from "../installer.js";
-import type { Scope, Agent } from "../types.js";
+import type { Scope, Agent, Tool } from "../types.js";
 
 interface InstallStepProps {
   scope: Scope;
   agent: Agent;
+  tool: Tool;
   onDone: () => void;
 }
 
-export function InstallStep({ scope, agent, onDone }: InstallStepProps) {
+export function InstallStep({ scope, agent, tool, onDone }: InstallStepProps) {
   const [status, setStatus] = useState("Starting...");
   const [steps, setSteps] = useState<string[]>([]);
   const [error, setError] = useState<string | undefined>();
@@ -21,6 +22,7 @@ export function InstallStep({ scope, agent, onDone }: InstallStepProps) {
         await install({
           scope,
           agent,
+          tool,
           cwd: process.cwd(),
           onStep: (msg: string) => {
             setSteps((prev) => [...prev, msg]);
@@ -33,7 +35,7 @@ export function InstallStep({ scope, agent, onDone }: InstallStepProps) {
       }
     };
     run();
-  }, [scope, agent, onDone]);
+  }, [scope, agent, tool, onDone]);
 
   if (error) {
     return (

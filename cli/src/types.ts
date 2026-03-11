@@ -1,5 +1,6 @@
 export type Scope = "project" | "global";
 export type Agent = "claude" | "codex" | "both";
+export type Tool = "linear" | "github";
 
 export const scopeLabels: Record<Scope, string> = {
   project: "This project",
@@ -10,4 +11,9 @@ export const agentLabels: Record<Agent, string> = {
   claude: "Claude Code",
   codex: "Codex CLI",
   both: "Claude Code + Codex CLI",
+};
+
+export const toolLabels: Record<Tool, string> = {
+  linear: "Linear",
+  github: "GitHub Issues",
 };

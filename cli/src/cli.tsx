@@ -13,10 +13,11 @@ const cli = meow(
   Options
     --scope    Pre-select scope: project or global
     --agent    Pre-select agent: claude, codex, or both
+    --tool     Pre-select PM tool: linear or github
 
   Examples
     $ npx trazador
-    $ npx trazador --scope project --agent claude
+    $ npx trazador --scope project --agent claude --tool linear
     $ npx trazador uninstall
 `,
   {
@@ -26,6 +27,9 @@ const cli = meow(
         type: "string",
       },
       agent: {
+        type: "string",
+      },
+      tool: {
         type: "string",
       },
     },
