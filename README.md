@@ -1,5 +1,7 @@
 # trazador
 
+*Trazador* (Spanish: tracer) — traces every task from issue to shipped PR. Nothing gets lost.
+
 A complete software engineering workflow for AI agents. From issue to shipped PR in a single run.
 
 ```bash
