@@ -1,3 +1,9 @@
+---
+name: trazador-spec-validation
+description: Validate specs before issue creation — catch infeasible criteria, vague requirements, and missing flows. Use during trazador plan phase.
+user-invocable: false
+---
+
 # Spec Validation Methodology
 
 Validate a drafted spec before it becomes a Linear issue. Catch infeasible criteria, vague requirements, and missing flows BEFORE implementation begins.

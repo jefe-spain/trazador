@@ -1,3 +1,9 @@
+---
+name: trazador-research
+description: Pre-implementation codebase research — map files, patterns, and conventions before writing code. Use during trazador work phase.
+user-invocable: false
+---
+
 # Pre-Implementation Research Methodology
 
 Research the codebase thoroughly before writing any code. Map the exact files, patterns, functions, and conventions you'll use. Prevents the agent from guessing and reinventing patterns that already exist.

@@ -1,3 +1,8 @@
+---
+name: trazador
+description: GitHub Issues agent workflow context — commands, session protocol, and design principles for trazador
+---
+
 # Trazador — GitHub Issues Agent Workflow
 
 Trazador connects Claude/Codex agents to GitHub Issues so that every task is traceable from requirement to shipped code.

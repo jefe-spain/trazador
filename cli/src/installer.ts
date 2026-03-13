@@ -270,10 +270,24 @@ async function installCodex({
         skillName,
       );
       await fs.mkdir(skillDir, { recursive: true });
-      await fs.copyFile(
+
+      // Transform Claude Code frontmatter to Codex format:
+      // - trazador:X → trazador-X
+      // - strip argument-hint (Codex doesn't support it)
+      let content = await fs.readFile(
         path.join(srcCommands, entry),
-        path.join(skillDir, "SKILL.md"),
+        "utf-8",
       );
+      content = content.replace(
+        /^---\n([\s\S]*?)---\n/,
+        (_match, frontmatter: string) => {
+          let fm = frontmatter;
+          fm = fm.replace(/name:\s*trazador:(\S+)/, "name: trazador-$1");
+          fm = fm.replace(/^argument-hint:.*\n/m, "");
+          return `---\n${fm}---\n`;
+        },
+      );
+      await fs.writeFile(path.join(skillDir, "SKILL.md"), content);
     }
   }
 
@@ -532,7 +546,7 @@ async function removeCodex(
   if (await fileExists(skillsBase)) {
     const entries = await fs.readdir(skillsBase);
     for (const entry of entries) {
-      if (entry.startsWith("trazador-")) {
+      if (entry === "trazador" || entry.startsWith("trazador-")) {
         await fs.rm(path.join(skillsBase, entry), { recursive: true });
       }
     }

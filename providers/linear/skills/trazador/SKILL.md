@@ -1,3 +1,8 @@
+---
+name: trazador
+description: Linear-native agent workflow context — commands, session protocol, and design principles for trazador
+---
+
 # Trazador — Linear-Native Agent Workflow
 
 Trazador connects Claude/Codex agents to Linear so that every task is traceable from requirement to shipped code.

@@ -1,3 +1,9 @@
+---
+name: trazador-tdd
+description: Adaptive TDD methodology — write tests from acceptance criteria before implementation. Use during trazador work phase.
+user-invocable: false
+---
+
 # Adaptive Test-Driven Development Methodology
 
 Write tests from acceptance criteria BEFORE implementation. Tests validate the spec, not the code. Adapts to the project — skips gracefully if no test framework exists.
