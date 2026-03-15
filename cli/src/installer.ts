@@ -6,7 +6,7 @@ import type { Scope, Agent, Tool } from "./types.js";
 
 interface InstallOptions {
   scope: Scope;
-  agent: Agent;
+  agents: Agent[];
   tool: Tool;
   cwd: string;
   onStep: (msg: string) => void;
@@ -43,27 +43,33 @@ function opencodeRoot(scope: Scope, cwd: string): string {
     : path.join(cwd, ".opencode");
 }
 
-function resolveAgents(agent: Agent | string | undefined): Array<"claude" | "codex" | "opencode"> {
-  if (agent === "all") {
+function normalizeAgents(
+  input: Agent[] | string[] | string | undefined,
+): Agent[] {
+  if (Array.isArray(input)) {
+    const raw = input
+      .map((item) => item.toLowerCase())
+      .filter((item) => item === "claude" || item === "codex" || item === "opencode") as Agent[];
+    if (raw.length > 0) return Array.from(new Set(raw));
     return ["claude", "codex", "opencode"];
   }
-  if (agent === "both") {
-    return ["claude", "codex"];
-  }
-  if (agent === "claude" || agent === "codex" || agent === "opencode") {
-    return [agent];
+
+  if (input === "both") return ["claude", "codex"];
+  if (input === "all") return ["claude", "codex", "opencode"];
+  if (input === "claude" || input === "codex" || input === "opencode") {
+    return [input];
   }
   return ["claude", "codex", "opencode"];
 }
 
 export async function install({
   scope,
-  agent,
+  agents,
   tool,
   cwd,
   onStep,
 }: InstallOptions): Promise<void> {
-  const agents = resolveAgents(agent);
+  const normalizedAgents = normalizeAgents(agents);
 
   const scopeLabel = scope === "global" ? "globally" : "for this project";
   onStep(`Installing ${scopeLabel}`);
@@ -82,13 +88,19 @@ export async function install({
       await fs.readFile(existingMetaPath, "utf-8"),
     );
     const existingTool = existingMeta.tools?.[0] ?? "linear";
-    if (existingTool !== tool || existingMeta.agent !== agent) {
-      onStep(`Removing previous install (${existingTool}/${existingMeta.agent ?? "unknown"})`);
+    const existingAgents = normalizeAgents(existingMeta.agents ?? existingMeta.agent);
+    const sameAgents =
+      existingAgents.length === normalizedAgents.length &&
+      existingAgents.every((item) => normalizedAgents.includes(item));
+    if (existingTool !== tool || !sameAgents) {
+      onStep(
+        `Removing previous install (${existingTool}/${existingAgents.join("+")})`,
+      );
       await uninstall({ cwd, onStep: () => {} });
     }
   }
 
-  for (const ag of agents) {
+  for (const ag of normalizedAgents) {
     if (ag === "claude") {
       await installClaude({ scope, tool, cwd, onStep });
     } else if (ag === "codex") {
@@ -105,7 +117,7 @@ export async function install({
   const version = await readPackageVersion();
   const meta = {
     scope,
-    agent,
+    agents: normalizedAgents,
     tools: [tool],
     installed_at: new Date().toISOString(),
     version,
@@ -126,7 +138,13 @@ export async function uninstall({
   const globalMeta = path.join(homeDir, ".trazador", "meta.json");
 
   let meta:
-    | { scope?: string; agent?: string; tools?: string[]; tool?: string }
+    | {
+        scope?: string;
+        agent?: string;
+        agents?: string[];
+        tools?: string[];
+        tool?: string;
+      }
     | undefined;
   let metaScope: Scope = "project";
 
@@ -141,7 +159,7 @@ export async function uninstall({
     return;
   }
 
-  const agents = resolveAgents(meta?.agent);
+  const agents = normalizeAgents(meta?.agents ?? meta?.agent);
 
   if (agents.includes("claude")) {
     await removeClaude(metaScope, cwd, meta, onStep);

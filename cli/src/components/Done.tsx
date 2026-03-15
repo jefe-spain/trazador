@@ -5,17 +5,11 @@ import type { Scope, Agent, Tool } from "../types.js";
 
 interface DoneProps {
   scope: Scope;
-  agent: Agent;
+  agents: Agent[];
   tool: Tool;
 }
 
-export function Done({ scope, agent, tool }: DoneProps) {
-  const agents =
-    agent === "all"
-      ? ["claude", "codex", "opencode"]
-      : agent === "both"
-        ? ["claude", "codex"]
-        : [agent];
+export function Done({ scope, agents, tool }: DoneProps) {
   const scopeDisplay = scope === "global" ? "Global" : "This project";
 
   return (
@@ -34,8 +28,8 @@ export function Done({ scope, agent, tool }: DoneProps) {
             <Text bold>{scopeDisplay}</Text>
           </Text>
           <Text>
-            <Text dimColor>{"Agent    "}</Text>
-            <Text bold>{agentLabels[agent]}</Text>
+            <Text dimColor>{"Agents   "}</Text>
+            <Text bold>{agents.map((item) => agentLabels[item]).join(" + ")}</Text>
           </Text>
           <Text>
             <Text dimColor>{"PM Tool  "}</Text>

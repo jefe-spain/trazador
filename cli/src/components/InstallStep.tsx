@@ -6,12 +6,12 @@ import type { Scope, Agent, Tool } from "../types.js";
 
 interface InstallStepProps {
   scope: Scope;
-  agent: Agent;
+  agents: Agent[];
   tool: Tool;
   onDone: () => void;
 }
 
-export function InstallStep({ scope, agent, tool, onDone }: InstallStepProps) {
+export function InstallStep({ scope, agents, tool, onDone }: InstallStepProps) {
   const [status, setStatus] = useState("Starting...");
   const [steps, setSteps] = useState<string[]>([]);
   const [error, setError] = useState<string | undefined>();
@@ -21,7 +21,7 @@ export function InstallStep({ scope, agent, tool, onDone }: InstallStepProps) {
       try {
         await install({
           scope,
-          agent,
+          agents,
           tool,
           cwd: process.cwd(),
           onStep: (msg: string) => {
@@ -35,7 +35,7 @@ export function InstallStep({ scope, agent, tool, onDone }: InstallStepProps) {
       }
     };
     run();
-  }, [scope, agent, tool, onDone]);
+  }, [scope, agents, tool, onDone]);
 
   if (error) {
     return (

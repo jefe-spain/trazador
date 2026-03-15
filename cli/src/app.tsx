@@ -21,19 +21,19 @@ interface Flags {
 
 export function App({ flags }: { flags: Flags }) {
   const initialScope = parseScope(flags.scope);
-  const initialAgent = parseAgent(flags.agent);
+  const initialAgents = parseAgents(flags.agent);
   const initialTool = parseTool(flags.tool);
 
   const startStep = (): Step => {
-    if (initialScope && initialAgent && initialTool) return "install";
-    if (initialScope && initialAgent) return "tool";
+    if (initialScope && initialAgents && initialTool) return "install";
+    if (initialScope && initialAgents) return "tool";
     if (initialScope) return "agent";
     return "scope";
   };
 
   const [step, setStep] = useState<Step>(startStep);
   const [scope, setScope] = useState<Scope | undefined>(initialScope);
-  const [agent, setAgent] = useState<Agent | undefined>(initialAgent);
+  const [agents, setAgents] = useState<Agent[] | undefined>(initialAgents);
   const [tool, setTool] = useState<Tool | undefined>(initialTool);
 
   return (
@@ -62,11 +62,11 @@ export function App({ flags }: { flags: Flags }) {
       )}
 
       {/* Completed: agent */}
-      {agent && step !== "scope" && step !== "agent" && step !== "done" && (
+      {agents && step !== "scope" && step !== "agent" && step !== "done" && (
         <Text>
           <Text color="green">◇</Text>
-          <Text>  Agent: </Text>
-          <Text bold>{agentLabels[agent]}</Text>
+          <Text>  Agents: </Text>
+          <Text bold>{formatAgents(agents)}</Text>
         </Text>
       )}
 
@@ -92,7 +92,7 @@ export function App({ flags }: { flags: Flags }) {
       {step === "agent" && (
         <AgentStep
           onSelect={(value) => {
-            setAgent(value);
+            setAgents(value);
             setStep("tool");
           }}
         />
@@ -107,17 +107,17 @@ export function App({ flags }: { flags: Flags }) {
         />
       )}
 
-      {step === "install" && scope && agent && tool && (
+      {step === "install" && scope && agents && tool && (
         <InstallStep
           scope={scope}
-          agent={agent}
+          agents={agents}
           tool={tool}
           onDone={() => setStep("done")}
         />
       )}
 
-      {step === "done" && scope && agent && tool && (
-        <Done scope={scope} agent={agent} tool={tool} />
+      {step === "done" && scope && agents && tool && (
+        <Done scope={scope} agents={agents} tool={tool} />
       )}
     </Box>
   );
@@ -128,17 +128,37 @@ function parseScope(value?: string): Scope | undefined {
   return undefined;
 }
 
-function parseAgent(value?: string): Agent | undefined {
-  if (
-    value === "claude" ||
-    value === "codex" ||
-    value === "opencode" ||
-    value === "both" ||
-    value === "all"
-  ) {
-    return value;
+function parseAgents(value?: string): Agent[] | undefined {
+  if (!value) return undefined;
+  const raw = value
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+
+  const picked: Agent[] = [];
+  for (const token of raw) {
+    if (token === "both") {
+      picked.push("claude", "codex");
+      continue;
+    }
+    if (token === "all") {
+      picked.push("claude", "codex", "opencode");
+      continue;
+    }
+    if (token === "claude" || token === "codex" || token === "opencode") {
+      picked.push(token);
+      continue;
+    }
+    return undefined;
   }
-  return undefined;
+
+  const deduped = Array.from(new Set(picked));
+  if (deduped.length === 0) return undefined;
+  return deduped;
+}
+
+function formatAgents(agents: Agent[]): string {
+  return agents.map((agent) => agentLabels[agent]).join(" + ");
 }
 
 function parseTool(value?: string): Tool | undefined {

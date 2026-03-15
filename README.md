@@ -24,11 +24,11 @@ Where should trazador be installed?
   ○ Global (all projects)
 
 Which agent runtime?
-  ● Claude Code
-  ○ Codex CLI
-  ○ OpenCode
-  ○ Both (Claude + Codex)
-  ○ All
+  > [x] Claude Code
+    [ ] Codex CLI
+    [ ] OpenCode
+
+  (Use space to toggle, enter to confirm)
 
 Which PM tool?
   ● Linear
@@ -137,9 +137,9 @@ Skip the interactive prompts:
 
 ```bash
 npx trazador --scope project --agent claude --tool linear
+npx trazador --scope project --agent claude,codex --tool linear
 npx trazador --scope project --agent opencode --tool linear
-npx trazador --agent both --tool github
-npx trazador --agent all --tool github
+npx trazador --agent claude,codex,opencode --tool github
 ```
 
 ## Uninstall
