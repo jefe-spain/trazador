@@ -8,7 +8,7 @@ A complete software engineering workflow for AI agents. From issue to shipped PR
 npx trazador
 ```
 
-Works with **Claude Code** and **Codex CLI**. Supports **Linear** and **GitHub Issues**.
+Works with **Claude Code**, **Codex CLI**, and **OpenCode**. Supports **Linear** and **GitHub Issues**.
 
 ## How it works
 
@@ -26,7 +26,9 @@ Where should trazador be installed?
 Which agent runtime?
   ● Claude Code
   ○ Codex CLI
-  ○ Both
+  ○ OpenCode
+  ○ Both (Claude + Codex)
+  ○ All
 
 Which PM tool?
   ● Linear
@@ -39,6 +41,19 @@ Which PM tool?
 ```
 
 **Step 2** — Inside your agent, run `/trazador:init` to connect to your PM tool.
+
+For **OpenCode**, trazador installs skills in `.opencode/skills/` following OpenCode's skill discovery rules.
+
+### Runtime install paths
+
+Depending on the selected agent runtime and scope, trazador installs into:
+
+- **Claude Code (project):** `.claude/commands/trazador/` and `.claude/skills/`
+- **Claude Code (global):** `~/.claude/commands/trazador/` and `~/.claude/skills/`
+- **Codex CLI (project):** `.agents/skills/` and `.codex/config.toml`
+- **Codex CLI (global):** `~/.codex/.agents/skills/` and `~/.codex/config.toml`
+- **OpenCode (project):** `.opencode/skills/`
+- **OpenCode (global):** `~/.config/opencode/skills/`
 
 - **Linear** — OAuth flow, pick a team/project, map workflow statuses
 - **GitHub Issues** — configure PAT, detect repo from git remote, set up labels
@@ -122,7 +137,9 @@ Skip the interactive prompts:
 
 ```bash
 npx trazador --scope project --agent claude --tool linear
+npx trazador --scope project --agent opencode --tool linear
 npx trazador --agent both --tool github
+npx trazador --agent all --tool github
 ```
 
 ## Uninstall
@@ -136,7 +153,7 @@ Removes all trazador files. Non-trazador config is preserved.
 ## Requirements
 
 - Node.js 18+
-- Claude Code or Codex CLI
+- Claude Code, Codex CLI, or OpenCode
 - Linear account or GitHub repo with Issues enabled
 
 ## License

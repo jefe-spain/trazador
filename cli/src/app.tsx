@@ -129,7 +129,15 @@ function parseScope(value?: string): Scope | undefined {
 }
 
 function parseAgent(value?: string): Agent | undefined {
-  if (value === "claude" || value === "codex" || value === "both") return value;
+  if (
+    value === "claude" ||
+    value === "codex" ||
+    value === "opencode" ||
+    value === "both" ||
+    value === "all"
+  ) {
+    return value;
+  }
   return undefined;
 }
 

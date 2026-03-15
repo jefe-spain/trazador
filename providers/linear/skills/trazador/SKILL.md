@@ -5,7 +5,7 @@ description: Linear-native agent workflow context — commands, session protocol
 
 # Trazador — Linear-Native Agent Workflow
 
-Trazador connects Claude/Codex agents to Linear so that every task is traceable from requirement to shipped code.
+Trazador connects Claude/Codex/OpenCode agents to Linear so that every task is traceable from requirement to shipped code.
 
 ## Core Principle
 
@@ -40,7 +40,7 @@ All commands read workspace constants (team, project, statuses, labels) from thi
 ## Workflow
 
 ```
-You (PM)                    Agent (Claude/Codex)
+You (PM)                    Agent (Claude/Codex/OpenCode)
    |                              |
    |-- /trazador:init ----------->|  (one-time setup)
    |                              |-- validates Linear MCP

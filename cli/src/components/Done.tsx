@@ -10,7 +10,12 @@ interface DoneProps {
 }
 
 export function Done({ scope, agent, tool }: DoneProps) {
-  const agents = agent === "both" ? ["claude", "codex"] : [agent];
+  const agents =
+    agent === "all"
+      ? ["claude", "codex", "opencode"]
+      : agent === "both"
+        ? ["claude", "codex"]
+        : [agent];
   const scopeDisplay = scope === "global" ? "Global" : "This project";
 
   return (
@@ -57,6 +62,14 @@ export function Done({ scope, agent, tool }: DoneProps) {
             <Text dimColor>|  </Text>
             <Text dimColor>{"  Codex CLI   -> "}</Text>
             <Text color="cyan" bold>See AGENTS.md</Text>
+          </Text>
+        )}
+
+        {agents.includes("opencode") && (
+          <Text>
+            <Text dimColor>|  </Text>
+            <Text dimColor>{"  OpenCode    -> "}</Text>
+            <Text color="cyan" bold>Use trazador-init skill</Text>
           </Text>
         )}
 

@@ -1,7 +1,7 @@
 {
   "name": "trazador",
-  "version": "0.2.0",
-  "description": "Agent workflow for project management — connect Claude Code or Codex to Linear and GitHub Issues.",
+  "version": "0.3.0",
+  "description": "Agent workflow for project management — connect Claude Code, Codex, or OpenCode to Linear and GitHub Issues.",
   "type": "module",
   "bin": {
     "trazador": "./cli/dist/cli.js"
@@ -33,6 +33,7 @@
     "project-management",
     "claude-code",
     "codex",
+    "opencode",
     "cli"
   ],
   "dependencies": {

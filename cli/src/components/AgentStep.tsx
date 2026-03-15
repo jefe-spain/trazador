@@ -21,7 +21,9 @@ export function AgentStep({ onSelect }: AgentStepProps) {
             options={[
               { label: "Claude Code", value: "claude" },
               { label: "Codex CLI", value: "codex" },
-              { label: "Both", value: "both" },
+              { label: "OpenCode", value: "opencode" },
+              { label: "Both (Claude + Codex)", value: "both" },
+              { label: "All", value: "all" },
             ]}
             onChange={(value) => onSelect(value as Agent)}
           />

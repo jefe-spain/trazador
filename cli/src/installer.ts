@@ -37,6 +37,25 @@ function codexRoot(scope: Scope, cwd: string): string {
   return scope === "global" ? path.join(homeDir, ".codex") : cwd;
 }
 
+function opencodeRoot(scope: Scope, cwd: string): string {
+  return scope === "global"
+    ? path.join(homeDir, ".config", "opencode")
+    : path.join(cwd, ".opencode");
+}
+
+function resolveAgents(agent: Agent | string | undefined): Array<"claude" | "codex" | "opencode"> {
+  if (agent === "all") {
+    return ["claude", "codex", "opencode"];
+  }
+  if (agent === "both") {
+    return ["claude", "codex"];
+  }
+  if (agent === "claude" || agent === "codex" || agent === "opencode") {
+    return [agent];
+  }
+  return ["claude", "codex", "opencode"];
+}
+
 export async function install({
   scope,
   agent,
@@ -44,8 +63,7 @@ export async function install({
   cwd,
   onStep,
 }: InstallOptions): Promise<void> {
-  const agents =
-    agent === "both" ? (["claude", "codex"] as const) : ([agent] as const);
+  const agents = resolveAgents(agent);
 
   const scopeLabel = scope === "global" ? "globally" : "for this project";
   onStep(`Installing ${scopeLabel}`);
@@ -73,8 +91,10 @@ export async function install({
   for (const ag of agents) {
     if (ag === "claude") {
       await installClaude({ scope, tool, cwd, onStep });
-    } else {
+    } else if (ag === "codex") {
       await installCodex({ scope, tool, cwd, onStep });
+    } else {
+      await installOpenCode({ scope, tool, cwd, onStep });
     }
   }
 
@@ -121,12 +141,7 @@ export async function uninstall({
     return;
   }
 
-  const agents: string[] =
-    meta?.agent === "both"
-      ? ["claude", "codex"]
-      : meta?.agent
-        ? [meta.agent]
-        : ["claude", "codex"];
+  const agents = resolveAgents(meta?.agent);
 
   if (agents.includes("claude")) {
     await removeClaude(metaScope, cwd, meta, onStep);
@@ -134,6 +149,10 @@ export async function uninstall({
 
   if (agents.includes("codex")) {
     await removeCodex(metaScope, cwd, onStep);
+  }
+
+  if (agents.includes("opencode")) {
+    await removeOpenCode(metaScope, cwd, onStep);
   }
 
   const trazadorDir =
@@ -271,22 +290,11 @@ async function installCodex({
       );
       await fs.mkdir(skillDir, { recursive: true });
 
-      // Transform Claude Code frontmatter to Codex format:
-      // - trazador:X → trazador-X
-      // - strip argument-hint (Codex doesn't support it)
       let content = await fs.readFile(
         path.join(srcCommands, entry),
         "utf-8",
       );
-      content = content.replace(
-        /^---\n([\s\S]*?)---\n/,
-        (_match, frontmatter: string) => {
-          let fm = frontmatter;
-          fm = fm.replace(/name:\s*trazador:(\S+)/, "name: trazador-$1");
-          fm = fm.replace(/^argument-hint:.*\n/m, "");
-          return `---\n${fm}---\n`;
-        },
-      );
+      content = transformCommandToSkill(content);
       await fs.writeFile(path.join(skillDir, "SKILL.md"), content);
     }
   }
@@ -396,6 +404,56 @@ async function installCodex({
 
   await fs.writeFile(configTomlPath, finalContent);
   onStep("Configured MCP in config.toml");
+}
+
+// --- OpenCode installer ---
+
+async function installOpenCode({
+  scope,
+  tool,
+  cwd,
+  onStep,
+}: {
+  scope: Scope;
+  tool: Tool;
+  cwd: string;
+  onStep: (msg: string) => void;
+}): Promise<void> {
+  const root = opencodeRoot(scope, cwd);
+  const providerDir = path.join(packageRoot, "providers", tool);
+  const toolName = tool.charAt(0).toUpperCase() + tool.slice(1);
+
+  onStep("Setting up OpenCode skills");
+  const skillsRoot = path.join(root, "skills");
+
+  // Copy command files as skills (trazador-init, trazador-plan, etc.)
+  const srcCommands = path.join(providerDir, "commands");
+  if (await fileExists(srcCommands)) {
+    onStep(`Installing ${toolName} workflow skills for OpenCode`);
+    const entries = await fs.readdir(srcCommands);
+    for (const entry of entries) {
+      if (!entry.endsWith(".md")) continue;
+      const skillName = `trazador-${entry.replace(".md", "")}`;
+      const skillDir = path.join(skillsRoot, skillName);
+      await fs.mkdir(skillDir, { recursive: true });
+
+      let content = await fs.readFile(path.join(srcCommands, entry), "utf-8");
+      content = transformCommandToSkill(content);
+
+      await fs.writeFile(path.join(skillDir, "SKILL.md"), content);
+    }
+  }
+
+  // Copy dedicated methodology skills
+  const srcSkills = path.join(providerDir, "skills");
+  if (await fileExists(srcSkills)) {
+    const skillEntries = await fs.readdir(srcSkills, { withFileTypes: true });
+    for (const entry of skillEntries) {
+      if (!entry.isDirectory()) continue;
+      const skillDir = path.join(skillsRoot, entry.name);
+      await copyDir(path.join(srcSkills, entry.name), skillDir);
+    }
+  }
 }
 
 // --- Uninstall helpers ---
@@ -612,6 +670,49 @@ async function removeCodex(
   }
 }
 
+async function removeOpenCode(
+  scope: Scope,
+  cwd: string,
+  onStep: (msg: string) => void,
+): Promise<void> {
+  const root = opencodeRoot(scope, cwd);
+  const skillsBase = path.join(root, "skills");
+
+  if (!(await fileExists(skillsBase))) {
+    return;
+  }
+
+  const entries = await fs.readdir(skillsBase);
+  let removedAny = false;
+  for (const entry of entries) {
+    if (entry === "trazador" || entry.startsWith("trazador-")) {
+      await fs.rm(path.join(skillsBase, entry), { recursive: true });
+      removedAny = true;
+    }
+  }
+
+  if (!removedAny) {
+    return;
+  }
+
+  const remainingSkills = await fs.readdir(skillsBase);
+  if (remainingSkills.length === 0) {
+    await fs.rm(skillsBase, { recursive: true });
+    try {
+      const remainingRoot = await fs.readdir(root);
+      if (remainingRoot.length === 0) {
+        await fs.rm(root, { recursive: true });
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const displayPath =
+    scope === "global" ? "~/.config/opencode/skills/" : ".opencode/skills/";
+  onStep(`Removed trazador skills from ${displayPath}`);
+}
+
 // --- Helpers ---
 
 async function ensureProviderExists(providerDir: string): Promise<void> {
@@ -620,6 +721,18 @@ async function ensureProviderExists(providerDir: string): Promise<void> {
       `Provider not found at ${providerDir}`,
     );
   }
+}
+
+function transformCommandToSkill(content: string): string {
+  return content.replace(
+    /^---\n([\s\S]*?)---\n/,
+    (_match: string, frontmatter: string) => {
+      let fm = frontmatter;
+      fm = fm.replace(/name:\s*trazador:(\S+)/, "name: trazador-$1");
+      fm = fm.replace(/^argument-hint:.*\n/m, "");
+      return `---\n${fm}---\n`;
+    },
+  );
 }
 
 async function copyDir(src: string, dest: string): Promise<void> {
